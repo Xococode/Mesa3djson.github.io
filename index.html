@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Table Drawer</title>
+    <style>
+        /* Reset básico */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            background-color: #f0f2f5;
+            position: relative;
+        }
+
+        /* Botón para Abrir el Panel Lateral */
+        #open-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background-color: #ffffff;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            width: 50px;
+            height: 50px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 5px rgba(0,0,0,0.1);
+            transition: background-color 0.3s ease-in-out;
+            z-index: 1001; /* Asegura que el botón esté encima del canvas */
+        }
+
+        #open-panel:hover {
+            background-color: #f0f0f0;
+        }
+
+        /* Icono para el Botón de Abrir */
+        #open-panel::before {
+            content: '⚙️'; /* Icono de engranaje */
+            font-size: 24px;
+            color: #333;
+        }
+
+        /* Panel Lateral */
+        #side-panel {
+            position: fixed;
+            top: 0;
+            left: -350px; /* Oculto por defecto */
+            width: 350px;
+            height: 100%;
+            background-color: #ffffff;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            transition: left 0.3s ease-in-out;
+            z-index: 1000;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        /* Panel Lateral Activo */
+        #side-panel.active {
+            left: 0;
+        }
+
+        /* Botón para Cerrar el Panel Lateral */
+        #close-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background-color: transparent;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: #aaa;
+            transition: color 0.3s ease-in-out;
+        }
+
+        #close-panel:hover {
+            color: #000;
+        }
+
+        /* Estilos Internos del Panel */
+        #input-container {
+            display: flex;
+            flex-direction: column;
+            margin-top: 60px; /* Espacio para el botón de cerrar */
+        }
+
+        h2 {
+            margin-bottom: 15px;
+            color: #333;
+            font-size: 1.5em;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 5px;
+        }
+
+        .slider-container, .color-container, .checkbox-container {
+            margin-bottom: 15px;
+        }
+
+        .slider-container label, .color-container label, .checkbox-container label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        .slider-container input[type="range"] {
+            width: 100%;
+        }
+
+        .color-container {
+            display: flex;
+            align-items: center;
+        }
+
+        .color-container input[type="color"] {
+            margin-right: 10px;
+            width: 40px;
+            height: 40px;
+            border: none;
+            cursor: pointer;
+        }
+
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+        }
+
+        .checkbox-container input[type="checkbox"] {
+            margin-right: 10px;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        /* Botones */
+        .button-group {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+
+        .button-group button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.3s;
+            flex: 1;
+            margin: 0 5px;
+        }
+
+        #download-json-button {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        #download-json-button:hover {
+            background-color: #45a049;
+        }
+
+        #reset-button {
+            background-color: #f44336;
+            color: white;
+        }
+
+        #reset-button:hover {
+            background-color: #e53935;
+        }
+
+        /* Error y Notificaciones */
+        .error, .notification {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .error {
+            background-color: #ffdddd;
+            color: #d8000c;
+            border: 1px solid #d8000c;
+        }
+
+        .notification {
+            background-color: #ddffdd;
+            color: #270;
+            border: 1px solid #270;
+        }
+
+        /* Canvas Container */
+        #canvas-container {
+            width: 100%;
+            height: 100vh;
+            position: relative;
+            z-index: 500; /* Debajo del botón de abrir */
+        }
+
+        /* Responsive Design */
+        @media (max-width: 400px) {
+            #open-panel {
+                width: 40px;
+                height: 40px;
+            }
+
+            #open-panel::before {
+                font-size: 20px;
+            }
+
+            #side-panel {
+                width: 80%;
+                left: -80%;
+            }
+
+            #side-panel.active {
+                left: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Botón para Abrir el Panel Lateral -->
+    <div id="open-panel" title="Abrir Controles"></div>
+
+    <!-- Panel Lateral -->
+    <div id="side-panel">
+        <!-- Botón para Cerrar el Panel Lateral -->
+        <button id="close-panel" title="Cerrar Controles">&times;</button>
+
+        <!-- Contenido del Panel -->
+        <div id="input-container">
+            <h2>Configuración de la Mesa</h2>
+            
+            <!-- Carga de Archivo JSON -->
+            <div class="file-upload">
+                <label for="file-input">Cargar Archivo JSON:</label>
+                <input type="file" id="file-input" accept=".json">
+            </div>
+            <div id="error" class="error"></div>
+            <div id="notification" class="notification"></div>
+
+            <!-- Controles de la Superficie -->
+            <div class="slider-container">
+                <label for="surface-width-slider" title="Ancho de la superficie">Ancho de la Superficie: <span id="surface-width-value">200</span>px</label>
+                <input type="range" id="surface-width-slider" min="50" max="400" value="200" oninput="updateTable()">
+            </div>
+            <div class="slider-container">
+                <label for="surface-depth-slider" title="Profundidad de la superficie">Profundidad de la Superficie: <span id="surface-depth-value">100</span>px</label>
+                <input type="range" id="surface-depth-slider" min="50" max="400" value="100" oninput="updateTable()">
+            </div>
+            <div class="slider-container">
+                <label for="surface-height-slider" title="Altura de la superficie">Altura de la Superficie: <span id="surface-height-value">10</span>px</label>
+                <input type="range" id="surface-height-slider" min="5" max="50" value="10" oninput="updateTable()">
+            </div>
+            <div class="slider-container">
+                <label for="surface-x-slider" title="Posición X de la superficie">Posición X de la Superficie: <span id="surface-x-value">0</span></label>
+                <input type="range" id="surface-x-slider" min="-200" max="200" value="0" oninput="updateTable()">
+            </div>
+            <div class="slider-container">
+                <label for="surface-y-slider" title="Posición Y de la superficie">Posición Y de la Superficie: <span id="surface-y-value">50</span></label>
+                <input type="range" id="surface-y-slider" min="0" max="200" value="50" oninput="updateTable()">
+            </div>
+            <div class="slider-container">
+                <label for="surface-z-slider" title="Posición Z de la superficie">Posición Z de la Superficie: <span id="surface-z-value">0</span></label>
+                <input type="range" id="surface-z-slider" min="-200" max="200" value="0" oninput="updateTable()">
+            </div>
+            <div class="color-container">
+                <label for="surface-color-picker" title="Color de la superficie">Color de la Superficie:</label>
+                <input type="color" id="surface-color-picker" value="#8B4513" oninput="updateTable()">
+            </div>
+
+            <!-- Controles de las Patas -->
+            <h2>Configuración de las Patas</h2>
+            <div class="slider-container">
+                <label for="legs-width-slider" title="Ancho de las patas">Ancho de las Patas: <span id="legs-width-value">10</span>px</label>
+                <input type="range" id="legs-width-slider" min="5" max="50" value="10" oninput="updateTable()">
+            </div>
+            <div class="slider-container">
+                <label for="legs-depth-slider" title="Profundidad de las patas">Profundidad de las Patas: <span id="legs-depth-value">10</span>px</label>
+                <input type="range" id="legs-depth-slider" min="5" max="50" value="10" oninput="updateTable()">
+            </div>
+            <div class="slider-container">
+                <label for="legs-height-slider" title="Altura de las patas">Altura de las Patas: <span id="legs-height-value">50</span>px</label>
+                <input type="range" id="legs-height-slider" min="20" max="200" value="50" oninput="updateTable()">
+            </div>
+            <div class="color-container">
+                <label for="legs-color-picker" title="Color de las patas">Color de las Patas:</label>
+                <input type="color" id="legs-color-picker" value="#654321" oninput="updateTable()">
+            </div>
+
+            <!-- Control de Visibilidad de la Rejilla -->
+            <div class="checkbox-container">
+                <input type="checkbox" id="toggle-grid" checked onchange="toggleGrid()">
+                <label for="toggle-grid" title="Mostrar u Ocultar Rejilla">Mostrar Rejilla</label>
+            </div>
+
+            <!-- Botones de Acción -->
+            <div class="button-group">
+                <button id="download-json-button">Descargar JSON</button>
+                <button id="reset-button">Reiniciar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenedor del Canvas -->
+    <div id="canvas-container"></div>
+
+    <!-- Librerías de Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        let jsonData = null;
+        let scene, camera, renderer, controls, table, gridHelper;
+
+        init();
+        animate();
+
+        // Inicializar la escena
+        function init() {
+            // Crear escena
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xf0f2f5);
+
+            // Configurar cámara
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 150, 300);
+
+            // Configurar renderizador
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true; // Habilitar sombras
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Tipo de sombras
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            // Configurar controles
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.25;
+            controls.screenSpacePanning = false;
+            controls.maxPolarAngle = Math.PI / 2;
+
+            // Añadir luces
+            // Luz Ambiental
+            const ambientLight = new THREE.AmbientLight(0x404040, 1.5); // Intensidad aumentada
+            scene.add(ambientLight);
+
+            // Luz Direccional para sombras
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(100, 200, 100);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 1024;
+            directionalLight.shadow.mapSize.height = 1024;
+            directionalLight.shadow.camera.near = 0.5;
+            directionalLight.shadow.camera.far = 500;
+            scene.add(directionalLight);
+
+            // Luz de Hemisferio
+            const hemisphereLight = new THREE.HemisphereLight(0xffffbb, 0x080820, 0.5);
+            scene.add(hemisphereLight);
+
+            // Añadir rejilla (GridHelper)
+            gridHelper = new THREE.GridHelper(1000, 100, 0x0000ff, 0x808080);
+            gridHelper.name = 'gridHelper'; // Asignar nombre para facilitar referencia
+            scene.add(gridHelper);
+
+            // Evento de redimensionamiento
+            window.addEventListener('resize', onWindowResize, false);
+        }
+
+        // Manejar redimensionamiento de ventana
+        function onWindowResize() {
+            const canvasWidth = window.innerWidth;
+            const canvasHeight = window.innerHeight;
+            camera.aspect = canvasWidth / canvasHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(canvasWidth, canvasHeight);
+        }
+
+        // Función de animación
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // Evento de carga de archivo JSON
+        document.getElementById('file-input').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            const reader = new FileReader();
+            const errorDiv = document.getElementById('error');
+            const notificationDiv = document.getElementById('notification');
+
+            reader.onload = function(event) {
+                try {
+                    jsonData = JSON.parse(event.target.result);
+                    const { surface, legs } = jsonData.table;
+
+                    // Actualizar controles con datos del JSON
+                    document.getElementById('surface-width-slider').value = surface.width;
+                    document.getElementById('surface-depth-slider').value = surface.depth;
+                    document.getElementById('surface-height-slider').value = surface.height;
+                    document.getElementById('surface-x-slider').value = surface.x;
+                    document.getElementById('surface-y-slider').value = surface.y;
+                    document.getElementById('surface-z-slider').value = surface.z;
+                    document.getElementById('surface-color-picker').value = surface.color;
+                    document.getElementById('legs-width-slider').value = legs.width;
+                    document.getElementById('legs-depth-slider').value = legs.depth;
+                    document.getElementById('legs-height-slider').value = legs.height;
+                    document.getElementById('legs-color-picker').value = legs.color;
+
+                    // Actualizar valores mostrados
+                    updateValueDisplays();
+
+                    // Limpiar mensajes
+                    errorDiv.style.display = 'none';
+                    notificationDiv.textContent = 'Archivo JSON cargado exitosamente.';
+                    notificationDiv.style.display = 'block';
+                    setTimeout(() => { notificationDiv.style.display = 'none'; }, 3000);
+
+                    // Dibujar la mesa
+                    drawTable(surface, legs);
+                } catch (error) {
+                    errorDiv.textContent = 'Entrada JSON inválida: ' + error.message;
+                    errorDiv.style.display = 'block';
+                    notificationDiv.style.display = 'none';
+                }
+            };
+
+            reader.onerror = function() {
+                errorDiv.textContent = 'Error al leer el archivo.';
+                errorDiv.style.display = 'block';
+                notificationDiv.style.display = 'none';
+            };
+
+            if (file) {
+                reader.readAsText(file);
+            }
+        });
+
+        // Función para dibujar la mesa
+        function drawTable(surface, legs) {
+            if (table) {
+                scene.remove(table);
+            }
+
+            table = new THREE.Group();
+
+            // Crear superficie con color sólido
+            const surfaceGeometry = new THREE.BoxGeometry(surface.width, surface.height, surface.depth);
+            const surfaceMaterial = new THREE.MeshStandardMaterial({ color: surface.color, roughness: 0.8, metalness: 0.2 });
+            const surfaceMesh = new THREE.Mesh(surfaceGeometry, surfaceMaterial);
+            surfaceMesh.position.set(surface.x, surface.y, surface.z);
+            surfaceMesh.castShadow = true;
+            surfaceMesh.receiveShadow = true;
+            table.add(surfaceMesh);
+
+            // Crear patas con color sólido
+            const legGeometry = new THREE.BoxGeometry(legs.width, legs.height, legs.depth);
+            const legMaterial = new THREE.MeshStandardMaterial({ color: legs.color, roughness: 0.8, metalness: 0.2 });
+
+            const legPositions = [
+                { x: surface.x - surface.width / 2 + legs.width / 2, y: surface.y - surface.height / 2 - legs.height / 2, z: surface.z - surface.depth / 2 + legs.depth / 2 },
+                { x: surface.x + surface.width / 2 - legs.width / 2, y: surface.y - surface.height / 2 - legs.height / 2, z: surface.z - surface.depth / 2 + legs.depth / 2 },
+                { x: surface.x - surface.width / 2 + legs.width / 2, y: surface.y - surface.height / 2 - legs.height / 2, z: surface.z + surface.depth / 2 - legs.depth / 2 },
+                { x: surface.x + surface.width / 2 - legs.width / 2, y: surface.y - surface.height / 2 - legs.height / 2, z: surface.z + surface.depth / 2 - legs.depth / 2 },
+            ];
+
+            legPositions.forEach(pos => {
+                const legMesh = new THREE.Mesh(legGeometry, legMaterial);
+                legMesh.position.set(pos.x, pos.y, pos.z);
+                legMesh.castShadow = true;
+                legMesh.receiveShadow = true;
+                table.add(legMesh);
+            });
+
+            scene.add(table);
+        }
+
+        // Función para actualizar la mesa según los controles
+        function updateTable() {
+            const surface = {
+                width: parseInt(document.getElementById('surface-width-slider').value),
+                depth: parseInt(document.getElementById('surface-depth-slider').value),
+                height: parseInt(document.getElementById('surface-height-slider').value),
+                x: parseInt(document.getElementById('surface-x-slider').value),
+                y: parseInt(document.getElementById('surface-y-slider').value),
+                z: parseInt(document.getElementById('surface-z-slider').value),
+                color: document.getElementById('surface-color-picker').value
+            };
+
+            const legs = {
+                width: parseInt(document.getElementById('legs-width-slider').value),
+                depth: parseInt(document.getElementById('legs-depth-slider').value),
+                height: parseInt(document.getElementById('legs-height-slider').value),
+                color: document.getElementById('legs-color-picker').value
+            };
+
+            // Actualizar valores mostrados
+            updateValueDisplays();
+
+            // Dibujar la mesa
+            drawTable(surface, legs);
+        }
+
+        // Función para actualizar los valores mostrados junto a los sliders
+        function updateValueDisplays() {
+            document.getElementById('surface-width-value').textContent = document.getElementById('surface-width-slider').value;
+            document.getElementById('surface-depth-value').textContent = document.getElementById('surface-depth-slider').value;
+            document.getElementById('surface-height-value').textContent = document.getElementById('surface-height-slider').value;
+            document.getElementById('surface-x-value').textContent = document.getElementById('surface-x-slider').value;
+            document.getElementById('surface-y-value').textContent = document.getElementById('surface-y-slider').value;
+            document.getElementById('surface-z-value').textContent = document.getElementById('surface-z-slider').value;
+            document.getElementById('legs-width-value').textContent = document.getElementById('legs-width-slider').value;
+            document.getElementById('legs-depth-value').textContent = document.getElementById('legs-depth-slider').value;
+            document.getElementById('legs-height-value').textContent = document.getElementById('legs-height-slider').value;
+        }
+
+        // Funcionalidad para descargar el archivo JSON
+        document.getElementById('download-json-button').addEventListener('click', function() {
+            const surface = {
+                width: parseInt(document.getElementById('surface-width-slider').value),
+                depth: parseInt(document.getElementById('surface-depth-slider').value),
+                height: parseInt(document.getElementById('surface-height-slider').value),
+                x: parseInt(document.getElementById('surface-x-slider').value),
+                y: parseInt(document.getElementById('surface-y-slider').value),
+                z: parseInt(document.getElementById('surface-z-slider').value),
+                color: document.getElementById('surface-color-picker').value
+            };
+
+            const legs = {
+                width: parseInt(document.getElementById('legs-width-slider').value),
+                depth: parseInt(document.getElementById('legs-depth-slider').value),
+                height: parseInt(document.getElementById('legs-height-slider').value),
+                color: document.getElementById('legs-color-picker').value
+            };
+
+            const data = {
+                table: {
+                    surface: surface,
+                    legs: legs
+                }
+            };
+
+            const jsonStr = JSON.stringify(data, null, 4);
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'tabla3D.json';
+            a.click();
+            URL.revokeObjectURL(url);
+
+            // Mostrar notificación
+            const notificationDiv = document.getElementById('notification');
+            notificationDiv.textContent = 'Archivo JSON descargado exitosamente.';
+            notificationDiv.style.display = 'block';
+            setTimeout(() => { notificationDiv.style.display = 'none'; }, 3000);
+        });
+
+        // Funcionalidad para reiniciar los controles a los valores predeterminados
+        document.getElementById('reset-button').addEventListener('click', function() {
+            // Valores predeterminados
+            const defaultSurface = {
+                width: 200,
+                depth: 100,
+                height: 10,
+                x: 0,
+                y: 50,
+                z: 0,
+                color: "#8B4513"
+            };
+
+            const defaultLegs = {
+                width: 10,
+                depth: 10,
+                height: 50,
+                color: "#654321"
+            };
+
+            // Actualizar controles de superficie
+            document.getElementById('surface-width-slider').value = defaultSurface.width;
+            document.getElementById('surface-depth-slider').value = defaultSurface.depth;
+            document.getElementById('surface-height-slider').value = defaultSurface.height;
+            document.getElementById('surface-x-slider').value = defaultSurface.x;
+            document.getElementById('surface-y-slider').value = defaultSurface.y;
+            document.getElementById('surface-z-slider').value = defaultSurface.z;
+            document.getElementById('surface-color-picker').value = defaultSurface.color;
+
+            // Actualizar controles de patas
+            document.getElementById('legs-width-slider').value = defaultLegs.width;
+            document.getElementById('legs-depth-slider').value = defaultLegs.depth;
+            document.getElementById('legs-height-slider').value = defaultLegs.height;
+            document.getElementById('legs-color-picker').value = defaultLegs.color;
+
+            // Actualizar valores mostrados
+            updateValueDisplays();
+
+            // Dibujar la mesa con valores predeterminados
+            drawTable(defaultSurface, defaultLegs);
+
+            // Limpiar mensajes
+            document.getElementById('error').style.display = 'none';
+            const notificationDiv = document.getElementById('notification');
+            notificationDiv.textContent = 'Configuración reiniciada a los valores predeterminados.';
+            notificationDiv.style.display = 'block';
+            setTimeout(() => { notificationDiv.style.display = 'none'; }, 3000);
+        });
+
+        // Funcionalidad para abrir el panel lateral
+        document.getElementById('open-panel').addEventListener('click', function() {
+            document.getElementById('side-panel').classList.add('active');
+        });
+
+        // Funcionalidad para cerrar el panel lateral
+        document.getElementById('close-panel').addEventListener('click', function() {
+            document.getElementById('side-panel').classList.remove('active');
+        });
+
+        // Cerrar el panel lateral al presionar la tecla "Esc"
+        window.addEventListener('keydown', function(event) {
+            if (event.key === "Escape") {
+                document.getElementById('side-panel').classList.remove('active');
+            }
+        });
+
+        // Función para mostrar valores al cargar la página
+        window.onload = function() {
+            updateValueDisplays();
+            // Dibujar la mesa con valores predeterminados al cargar
+            const defaultSurface = {
+                width: 200,
+                depth: 100,
+                height: 10,
+                x: 0,
+                y: 50,
+                z: 0,
+                color: "#8B4513"
+            };
+
+            const defaultLegs = {
+                width: 10,
+                depth: 10,
+                height: 50,
+                color: "#654321"
+            };
+
+            drawTable(defaultSurface, defaultLegs);
+        };
+
+        // Función para togglear la rejilla
+        function toggleGrid() {
+            const grid = scene.getObjectByName('gridHelper');
+            if (grid) {
+                grid.visible = document.getElementById('toggle-grid').checked;
+            }
+        }
+    </script>
+</body>
+</html>
