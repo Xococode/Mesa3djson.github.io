@@ -2,7 +2,7 @@
 
 3D Table Drawer es una aplicación web interactiva que permite diseñar y personalizar mesas en un entorno 3D utilizando Three.js. La interfaz incluye un panel de control lateral donde se pueden ajustar dimensiones, colores y posiciones, además de la posibilidad de descargar la configuración en formato JSON.
 
-![Unicornio 3D CAD](Captura-json.JPG)
+![3D Table Drawer](Captura-json.JPG)
 
 
 ## Acceso Rápido a la Aplicación
