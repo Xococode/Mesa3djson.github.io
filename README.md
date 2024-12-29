@@ -6,7 +6,7 @@
 
 
 ## Acceso Rápido a la Aplicación
-[Unicornio 3D CAD - Demo en vivo](https://xococode.github.io/Unicornio3d/)
+[3D Table Drawer](https://xococode.github.io/Unicornio3d/)
 
 ## Características
 - **Interfaz en 3D:** Visualiza y ajusta mesas en tiempo real.
